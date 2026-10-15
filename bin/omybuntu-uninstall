@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# omybuntu:summary=Uninstall Omybuntu: remove all installed packages, configs, and optional software
+# omybuntu:requires-sudo=true
+
+export OMYBUNTU_PATH="${OMYBUNTU_PATH:-$HOME/.local/share/omybuntu}"
+export OMYBUNTU_BIN_DIR="$OMYBUNTU_PATH/bin"
+
+source "$OMYBUNTU_PATH/default/i18n/init.sh"
+
+echo -e "This will uninstall Omybuntu and remove all packages and configs installed through it.\nWarning: This action is irreversible.\n"
+
+if ! gum confirm "Are you sure?"; then
+  echo "Cancelled."
+  exit 0
+fi
+
+echo -e "Removing base packages...\n"
+if [[ -f "$OMYBUNTU_PATH/install/omybuntu-base.packages" ]]; then
+  mapfile -t packages < <(grep -v '^#' "$OMYBUNTU_PATH/install/omybuntu-base.packages" | grep -v '^$')
+  if (( ${#packages[@]} > 0 )); then
+    omybuntu-pkg-drop "${packages[@]}"
+  fi
+fi
+
+echo -e "\nRemoving optional software installed via omybuntu-install-*...\n"
+for cmd in "$OMYBUNTU_BIN_DIR"/omybuntu-remove-*; do
+  [[ -f "$cmd" && -x "$cmd" ]] || continue
+  binary_name=$(basename "$cmd")
+  echo "Running: $binary_name"
+  bash "$cmd" 2>/dev/null || true
+done
+
+echo -e "\nResetting configs to defaults...\n"
+omybuntu-reinstall-configs
+
+echo -e "\nCleaning up npm stubs and custom binaries...\n"
+rm -f ~/.local/bin/codex ~/.local/bin/gemini ~/.local/bin/copilot \
+      ~/.local/bin/opencode ~/.local/bin/playwright-cli ~/.local/bin/pi \
+      ~/.local/bin/cliamp 2>/dev/null || true
+
+echo -e "\nRemoving omybuntu directory...\n"
+rm -rf "$OMYBUNTU_PATH" 2>/dev/null || true
+
+echo -e "\nOmybuntu has been uninstalled."
